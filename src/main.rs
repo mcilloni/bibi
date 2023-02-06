@@ -2,10 +2,8 @@ use std::{error::Error, fs::read_to_string, io::stdout};
 
 use clap::Parser as ClapParser;
 use pulldown_cmark::{Options, Parser};
-use writefmt::IoWriter;
 
 mod bbcode;
-mod writefmt;
 
 /// dumb test
 #[derive(ClapParser, Debug)]
@@ -25,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let parser = Parser::new_ext(&contents, options);
 
-    bbcode::write_bbcode(IoWriter(stdout()), parser)?;
+    bbcode::write_bbcode(stdout(), parser)?;
 
     Ok(())
 }

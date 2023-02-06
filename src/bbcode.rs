@@ -1,30 +1,33 @@
-use std::io;
+use std::{io::{self, Write}, fmt};
 
 use pulldown_cmark::{CodeBlockKind, Event, Tag};
 
-use crate::writefmt::WriteFmt;
-
-struct BBCode<I, W: WriteFmt> {
-    /// Iterator supplying events.
+struct BBCode<I, W: io::Write> {
     iter: I,
 
-    /// Writer to write to.
     writer: W,
+
+    at_newline: bool,
+    buf: Vec<u8>,
 }
 
 impl<'a, I, W> BBCode<I, W>
 where
     I: Iterator<Item = Event<'a>> + 'a,
-    W: WriteFmt,
+    W: io::Write,
 {
     fn new(iter: I, writer: W) -> Self {
-        Self { iter, writer }
+        Self { iter, writer, at_newline: true, buf: vec![] }
     }
 
-    /// Writes a buffer, and tracks whether or not a newline was written.
-    #[inline]
-    fn write(&mut self, s: &str) -> io::Result<()> {
-        write!(self.writer, "{}", s)
+    fn write_fmt(&mut self, args: fmt::Arguments) -> io::Result<()> {
+        self.buf.clear();
+
+        self.buf.write_fmt(args)?;
+
+        self.at_newline = self.buf.last().map(|&b| b == b'\n').unwrap_or_default();
+
+        self.writer.write_all(&self.buf)
     }
 
     fn run(mut self) -> io::Result<()> {
@@ -42,18 +45,18 @@ where
                     write!(self.writer, "{text}")?;
                 }
                 Code(text) => {
-                    self.write("[c=inline]")?;
+                    write!(self, "[c=inline]")?;
                     write!(self.writer, "{text}")?;
-                    self.write("[/c]")?;
+                    write!(self, "[/c]")?;
                 }
                 SoftBreak => {
-                    self.write("\n")?;
+                    write!(self, "\n")?;
                 }
                 HardBreak => {
-                    self.write("\n\n")?;
+                    write!(self, "\n\n")?;
                 }
                 Rule => {
-                    self.write("[hr]\n")?;
+                    write!(self, "[hr]\n")?;
                 }
                 _ => continue,
             }
@@ -68,8 +71,8 @@ where
 
         match tag {
             Paragraph => Ok(()),
-            Heading(..) => self.write("[big]"),
-            BlockQuote => self.write("[quote]\n"),
+            Heading(..) => write!(self, "[big]"),
+            BlockQuote => write!(self, "[quote]\n"),
             CodeBlock(info) => {
                 use CodeBlockKind::*;
 
@@ -80,23 +83,29 @@ where
 
                         write!(self.writer, "[code={lang}]\n")
                     }
-                    Indented => self.write("[code=code]\n"),
+                    Indented => write!(self, "[code=code]\n"),
                 }
             }
-            List(Some(1)) => self.write("[list type=\"1\"]\n"),
+            List(Some(1)) => write!(self, "[list type=\"1\"]\n"),
             List(Some(start)) => {
                 write!(self.writer, "[list start=\"{start}\"]\n")
             }
-            List(None) => self.write("[list]\n"),
-            Item => self.write("[*]"),
-            Emphasis => self.write("[cur]"),
-            Strong => self.write("[b]"),
-            Strikethrough => self.write("[del]"),
+            List(None) => write!(self, "[list]\n"),
+            Item => {
+                if self.at_newline {
+                    write!(self, "[*]")
+                } else {
+                    write!(self, "\n[*]")
+                }
+            }
+            Emphasis => write!(self, "[cur]"),
+            Strong => write!(self, "[b]"),
+            Strikethrough => write!(self, "[del]"),
             Link(_, dest, _) => {
                 write!(self.writer, "[url={dest}]")
             }
             Image(_, dest, _) => {
-                write!(self.writer, "[img]{dest}")
+                write!(self.writer, "[img]{dest}[/img]")
             }
             _ => Ok(()),
         }
@@ -107,38 +116,34 @@ where
 
         match tag {
             Paragraph => {
-                self.write("\n\n")?;
+                write!(self, "\n\n")?;
             }
             Heading(..) => {
-                self.write("[/big]\n")?;
+                write!(self, "[/big]\n\n")?;
             }
             BlockQuote => {
-                self.write("[/quote]\n")?;
+                write!(self, "[/quote]\n")?;
             }
             CodeBlock(_) => {
-                self.write("[/code]\n")?;
+                write!(self, "[/code]\n")?;
             }
             List(_) => {
-                self.write("[/list]\n")?;
+                write!(self, "[/list]\n")?;
             }
-            Item => {
-                self.write("\n")?;
-            }
+            Item => {}
             Emphasis => {
-                self.write("[/cur]")?;
+                write!(self, "[/cur]")?;
             }
             Strong => {
-                self.write("[/b]")?;
+                write!(self, "[/b]")?;
             }
             Strikethrough => {
-                self.write("[/del]")?;
+                write!(self, "[/del]")?;
             }
             Link(_, _, _) => {
-                self.write("[/a]")?;
+                write!(self, "[/a]")?;
             }
-            Image(_, _, _) => {
-                self.write("[/img]")?;
-            }
+            Image(_, _, _) => {} // do nothing, the image has already been closed in the start function
             _ => {}
         }
         Ok(())
@@ -148,7 +153,7 @@ where
 pub fn write_bbcode<'a, I, W>(writer: W, iter: I) -> io::Result<()>
 where
     I: Iterator<Item = Event<'a>> + 'a,
-    W: WriteFmt,
+    W: io::Write,
 {
     BBCode::new(iter, writer).run()
 }
