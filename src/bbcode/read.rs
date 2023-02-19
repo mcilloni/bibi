@@ -2,7 +2,7 @@ use std::{borrow::Cow, io};
 
 use lazy_static::lazy_static;
 
-use regex::{Regex, RegexSet};
+use regex::{Regex};
 use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Clone, Copy, Debug, EnumIter, Eq, PartialEq)]
@@ -47,7 +47,7 @@ enum TextChunk<'a> {
 
 fn extract_inner<'a>(tag_block: &'a str, kind: CodeKind) -> &'a str {
     // assume starts and ends have alredy been checked
-    let tag_end = tag_block.find("]").expect("this can never happen") + 1;
+    let tag_end = tag_block.find(']').expect("this can never happen") + 1;
 
     &tag_block[tag_end..(tag_block.len() - kind.end_seq().len())]
 }

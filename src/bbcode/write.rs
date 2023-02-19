@@ -76,13 +76,13 @@ where
                     write!(self, "[/c]")?;
                 }
                 SoftBreak => {
-                    write!(self, "\n")?;
+                    writeln!(self)?;
                 }
                 HardBreak => {
                     write!(self, "\n\n")?;
                 }
                 Rule => {
-                    write!(self, "[hr]\n")?;
+                    writeln!(self, "[hr]")?;
                 }
                 _ => continue,
             }
@@ -98,7 +98,7 @@ where
         match tag {
             Paragraph => Ok(()),
             Heading(..) => write!(self, "[big]"),
-            BlockQuote => write!(self, "[quote]\n"),
+            BlockQuote => writeln!(self, "[quote]"),
             CodeBlock(info) => {
                 use CodeBlockKind::*;
 
@@ -107,16 +107,16 @@ where
                         let lang = info.split(' ').next().unwrap();
                         let lang = if lang.is_empty() { "code" } else { lang };
 
-                        write!(self, "[code={lang}]\n")
+                        writeln!(self, "[code={lang}]")
                     }
-                    Indented => write!(self, "[code=code]\n"),
+                    Indented => writeln!(self, "[code=code]"),
                 }
             }
-            List(Some(1)) => write!(self, "[list type=\"1\"]\n"),
+            List(Some(1)) => writeln!(self, "[list type=\"1\"]"),
             List(Some(start)) => {
-                write!(self, "[list start=\"{start}\"]\n")
+                writeln!(self, "[list start=\"{start}\"]")
             }
-            List(None) => write!(self, "[list]\n"),
+            List(None) => writeln!(self, "[list]"),
             Item => {
                 self.ensure_newline()?;
 
@@ -146,15 +146,15 @@ where
                 write!(self, "[/big]\n\n")?;
             }
             BlockQuote => {
-                write!(self, "[/quote]\n")?;
+                writeln!(self, "[/quote]")?;
             }
             CodeBlock(_) => {
                 self.ensure_newline()?;
-                write!(self, "[/code]\n")?;
+                writeln!(self, "[/code]")?;
             }
             List(_) => {
                 self.ensure_newline()?;
-                write!(self, "[/list]\n")?;
+                writeln!(self, "[/list]")?;
             }
             Item => {}
             Emphasis => {
