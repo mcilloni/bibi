@@ -1,8 +1,7 @@
-use std::{io, borrow::Cow};
+use std::{borrow::Cow, io};
 
 use lazy_static::lazy_static;
 
-use nom::{branch::alt, bytes::complete::take_until};
 use regex::{Regex, RegexSet};
 use strum::{EnumIter, IntoEnumIterator};
 
@@ -60,16 +59,15 @@ fn next_codestart<'a>(content: &'a str) -> Option<(usize, CodeKind)> {
         let tag = &content[pos..];
 
         CodeKind::iter()
-            .find_map(|bt| {
-                tag.starts_with(bt.start_seq())
-                    .then_some((pos, bt))
+            .find_map(|bt| tag.starts_with(bt.start_seq()).then_some((pos, bt)))
+            .or_else(|| {
+                next_codestart(&tag[PROBE.len()..]).map(|(rel_pos, bt)| (pos + rel_pos, bt))
             })
-            .or_else(|| next_codestart(&tag[PROBE.len()..]).map(|(rel_pos, bt)| (pos + rel_pos, bt)))
     })
 }
 
 fn next_codeend<'a>(content: &'a str, kind: CodeKind) -> Option<usize> {
-    const NEWLINES : &[u8] = b"\r\n";
+    const NEWLINES: &[u8] = b"\r\n";
 
     let probe = kind.end_seq().as_bytes();
 
@@ -92,31 +90,36 @@ fn next_codeend<'a>(content: &'a str, kind: CodeKind) -> Option<usize> {
 
 fn parse_lang<'a>(content: &'a str) -> Option<&'a str> {
     lazy_static! {
-        static ref LANG_TAG : Regex = Regex::new(r#"^\s*"?([^"]+?)"?\s*\]"#).unwrap();
+        static ref LANG_TAG: Regex = Regex::new(r#"^\s*"?([^"]+?)"?\s*\]"#).unwrap();
     }
 
-    LANG_TAG.captures(content).and_then(|c| c.get(1)).map(|m| m.as_str())
+    LANG_TAG
+        .captures(content)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str())
 }
 
 fn compact(chunks: Vec<TextChunk>) -> Vec<TextChunk> {
     use TextChunk::*;
 
-    let (rem, mut ret) = chunks.into_iter().fold((None, vec![]), |(current, mut acc), chunk| {
-        let current = match (current, chunk) {
-            (None, code @ Code { .. }) => {
-                acc.push(code);
-                None
-            }
-            (None, Chars(cs)) => Some(cs),
-            (Some(text), code @ Code { .. }) => {
-                acc.extend([Chars(text), code]);
-                None
-            }
-            (Some(text), Chars(more)) => Some(format!("{text}{more}").into()),
-        };
+    let (rem, mut ret) = chunks
+        .into_iter()
+        .fold((None, vec![]), |(current, mut acc), chunk| {
+            let current = match (current, chunk) {
+                (None, code @ Code { .. }) => {
+                    acc.push(code);
+                    None
+                }
+                (None, Chars(cs)) => Some(cs),
+                (Some(text), code @ Code { .. }) => {
+                    acc.extend([Chars(text), code]);
+                    None
+                }
+                (Some(text), Chars(more)) => Some(format!("{text}{more}").into()),
+            };
 
-        (current, acc)
-    });
+            (current, acc)
+        });
 
     if let Some(reminder) = rem {
         ret.push(Chars(reminder));
@@ -138,20 +141,29 @@ fn slurp_codetags<'a>(mut content: &'a str) -> Vec<TextChunk<'a>> {
         let start_tok_len = kind.start_seq().len();
         let (tag, at_langstart) = start.split_at(start_tok_len);
 
-        let (block, rem) = next_codeend(start, kind).and_then(|pos| {
-            let (code_block, rest) = start.split_at(pos);
+        let (block, rem) = next_codeend(start, kind)
+            .and_then(|pos| {
+                let (code_block, rest) = start.split_at(pos);
 
-            // skip the initial chunk and start with the `"`
-            parse_lang(&code_block[start_tok_len..]).map(|lang| {
-                let inside = extract_inner(code_block, kind);
+                // skip the initial chunk and start with the `"`
+                parse_lang(&code_block[start_tok_len..]).map(|lang| {
+                    let inside = extract_inner(code_block, kind);
 
-                (Code { kind, lang, content: inside}, rest)
+                    (
+                        Code {
+                            kind,
+                            lang,
+                            content: inside,
+                        },
+                        rest,
+                    )
+                })
             })
-        }).unwrap_or_else(|| {
-            // the first part of the tag becomes a char block, and we continue straight after it
-            (Chars(tag.into()), at_langstart)
-        });
-        
+            .unwrap_or_else(|| {
+                // the first part of the tag becomes a char block, and we continue straight after it
+                (Chars(tag.into()), at_langstart)
+            });
+
         chunks.push(block);
         content = rem;
     }

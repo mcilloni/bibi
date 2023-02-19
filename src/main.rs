@@ -1,7 +1,6 @@
-use std::{error::Error, fs::read_to_string, io::stdout};
+use std::{error::Error, ffi::OsStr, fs::read_to_string, io::stdout, path::Path};
 
 use clap::Parser as ClapParser;
-use pulldown_cmark::{Options, Parser};
 
 mod bbcode;
 
@@ -16,14 +15,13 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let Args { file } = Args::parse();
 
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_STRIKETHROUGH);
+    let contents = read_to_string(&file)?;
 
-    let contents = read_to_string(file)?;
-
-    let parser = Parser::new_ext(&contents, options);
-
-    bbcode::write_bbcode(stdout(), parser)?;
+    if let Some("md") = Path::new(&file).extension().and_then(OsStr::to_str) {
+        bbcode::dump_bbcode(stdout(), &contents)?;
+    } else {
+        bbcode::dump_markdown(stdout(), &contents)?;
+    }
 
     Ok(())
 }
