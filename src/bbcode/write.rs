@@ -1,6 +1,9 @@
-use std::{io::{self, Write}, fmt};
+use std::{
+    fmt,
+    io::{self, Write},
+};
 
-use pulldown_cmark::{CodeBlockKind, Event, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
 struct BBCode<I, W: io::Write> {
     iter: I,
@@ -17,7 +20,30 @@ where
     W: io::Write,
 {
     fn new(iter: I, writer: W) -> Self {
-        Self { iter, writer, at_newline: true, buf: vec![] }
+        Self {
+            iter,
+            writer,
+            at_newline: true,
+            buf: vec![],
+        }
+    }
+
+    fn ensure_newline(&mut self) -> io::Result<()> {
+        if !self.at_newline {
+            #[cfg(windows)]
+            const LINE_END: &str = "\r\n";
+
+            #[cfg(not(windows))]
+            const LINE_END: &str = "\n";
+
+            write!(self, "{}", LINE_END)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_buf(&mut self) -> io::Result<()> {
+        self.writer.write_all(&self.buf)
     }
 
     fn write_fmt(&mut self, args: fmt::Arguments) -> io::Result<()> {
@@ -27,7 +53,7 @@ where
 
         self.at_newline = self.buf.last().map(|&b| b == b'\n').unwrap_or_default();
 
-        self.writer.write_all(&self.buf)
+        self.write_buf()
     }
 
     fn run(mut self) -> io::Result<()> {
@@ -42,11 +68,11 @@ where
                     self.end_tag(tag)?;
                 }
                 Text(text) => {
-                    write!(self.writer, "{text}")?;
+                    write!(self, "{text}")?;
                 }
                 Code(text) => {
                     write!(self, "[c=inline]")?;
-                    write!(self.writer, "{text}")?;
+                    write!(self, "{text}")?;
                     write!(self, "[/c]")?;
                 }
                 SoftBreak => {
@@ -81,31 +107,29 @@ where
                         let lang = info.split(' ').next().unwrap();
                         let lang = if lang.is_empty() { "code" } else { lang };
 
-                        write!(self.writer, "[code={lang}]\n")
+                        write!(self, "[code={lang}]\n")
                     }
                     Indented => write!(self, "[code=code]\n"),
                 }
             }
             List(Some(1)) => write!(self, "[list type=\"1\"]\n"),
             List(Some(start)) => {
-                write!(self.writer, "[list start=\"{start}\"]\n")
+                write!(self, "[list start=\"{start}\"]\n")
             }
             List(None) => write!(self, "[list]\n"),
             Item => {
-                if self.at_newline {
-                    write!(self, "[*]")
-                } else {
-                    write!(self, "\n[*]")
-                }
+                self.ensure_newline()?;
+
+                write!(self, "[*]")
             }
             Emphasis => write!(self, "[cur]"),
             Strong => write!(self, "[b]"),
             Strikethrough => write!(self, "[del]"),
             Link(_, dest, _) => {
-                write!(self.writer, "[url={dest}]")
+                write!(self, "[url={dest}]")
             }
             Image(_, dest, _) => {
-                write!(self.writer, "[img]{dest}[/img]")
+                write!(self, "[img]{dest}[/img]")
             }
             _ => Ok(()),
         }
@@ -125,9 +149,11 @@ where
                 write!(self, "[/quote]\n")?;
             }
             CodeBlock(_) => {
+                self.ensure_newline()?;
                 write!(self, "[/code]\n")?;
             }
             List(_) => {
+                self.ensure_newline()?;
                 write!(self, "[/list]\n")?;
             }
             Item => {}
@@ -141,7 +167,7 @@ where
                 write!(self, "[/del]")?;
             }
             Link(_, _, _) => {
-                write!(self, "[/a]")?;
+                write!(self, "[/url]")?;
             }
             Image(_, _, _) => {} // do nothing, the image has already been closed in the start function
             _ => {}
@@ -150,10 +176,14 @@ where
     }
 }
 
-pub fn write_bbcode<'a, I, W>(writer: W, iter: I) -> io::Result<()>
+pub fn dump_bbcode<'a, W>(writer: W, contents: &str) -> io::Result<()>
 where
-    I: Iterator<Item = Event<'a>> + 'a,
     W: io::Write,
 {
-    BBCode::new(iter, writer).run()
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+
+    let parser = Parser::new_ext(contents, options);
+
+    BBCode::new(parser, writer).run()
 }
