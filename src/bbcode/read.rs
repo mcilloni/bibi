@@ -2,7 +2,7 @@ use std::{borrow::Cow, io};
 
 use lazy_static::lazy_static;
 
-use regex::{Regex};
+use regex::Regex;
 use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Clone, Copy, Debug, EnumIter, Eq, PartialEq)]
@@ -179,9 +179,6 @@ fn convert_bbcode(content: &str) -> String {
     String::new()
 }
 
-pub fn dump_markdown<'a, W>(mut writer: W, content: &str) -> io::Result<()>
-where
-    W: io::Write,
-{
+pub fn dump_markdown(mut writer: impl io::Write, content: &str) -> io::Result<()> {
     write!(writer, "{}", convert_bbcode(content))
 }

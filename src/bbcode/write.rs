@@ -176,10 +176,7 @@ where
     }
 }
 
-pub fn dump_bbcode<'a, W>(writer: W, contents: &str) -> io::Result<()>
-where
-    W: io::Write,
-{
+pub fn dump_bbcode(writer: impl io::Write, contents: &str) -> io::Result<()> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
 
