@@ -5,6 +5,9 @@ use std::{
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
+pub const DEFAULT_ANON_CODELANG: &str = "code";
+pub const DEFAULT_ANON_ICODELANG: &str = "inline";
+
 struct BBCode<I, W: io::Write> {
     iter: I,
 
@@ -71,7 +74,7 @@ where
                     write!(self, "{text}")?;
                 }
                 Code(text) => {
-                    write!(self, "[c=inline]")?;
+                    write!(self, "[c={DEFAULT_ANON_ICODELANG}]")?;
                     write!(self, "{text}")?;
                     write!(self, "[/c]")?;
                 }
@@ -102,15 +105,20 @@ where
             CodeBlock(info) => {
                 use CodeBlockKind::*;
 
-                match info {
+                let lang = match &info {
                     Fenced(info) => {
                         let lang = info.split(' ').next().unwrap();
-                        let lang = if lang.is_empty() { "code" } else { lang };
 
-                        writeln!(self, "[code={lang}]")
+                        if lang.is_empty() {
+                            "code"
+                        } else {
+                            lang
+                        }
                     }
-                    Indented => writeln!(self, "[code=code]"),
-                }
+                    Indented => DEFAULT_ANON_CODELANG,
+                };
+
+                writeln!(self, "[code={lang}]")
             }
             List(Some(1)) => writeln!(self, "[list type=\"1\"]"),
             List(Some(start)) => {
