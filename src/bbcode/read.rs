@@ -1,29 +1,21 @@
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    io,
-    iter::{once, repeat},
-    ops::ControlFlow,
-    str::FromStr,
-};
+use std::{borrow::Cow, collections::HashSet, io, ops::ControlFlow};
 
 use lazy_static::lazy_static;
 
 use itertools::Itertools;
 use nom::{
     branch::alt,
-    bytes::complete::{is_not, tag, take_while},
-    character::complete::{char, digit1, space0, space1},
-    combinator::{all_consuming, map, map_res, value},
-    multi::{fold_many0, fold_many1, many0},
-    sequence::{delimited, preceded, separated_pair, tuple},
+    bytes::complete::tag,
+    character::complete::{char, digit1, space1},
+    combinator::{map, map_res, value},
+    multi::fold_many0,
+    sequence::{delimited, preceded, separated_pair},
     IResult,
 };
-use num::{Num, Unsigned};
-use numerals::roman::{self, Roman};
+
+use numerals::roman::Roman;
 use regex::{Captures, Regex};
 use strum::{EnumIter, IntoEnumIterator};
-use unicode_normalization::UnicodeNormalization;
 
 use crate::bbcode::write::{DEFAULT_ANON_CODELANG, DEFAULT_ANON_ICODELANG};
 
