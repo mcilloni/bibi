@@ -2,7 +2,7 @@ use std::{error::Error, ffi::OsStr, fs::read_to_string, io::stdout, path::Path};
 
 use clap::Parser as ClapParser;
 
-mod bbcode;
+use bibi::{dump_bbcode, dump_markdown};
 
 /// dumb test
 #[derive(ClapParser, Debug)]
@@ -18,9 +18,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let contents = read_to_string(&file)?;
 
     if let Some("md") = Path::new(&file).extension().and_then(OsStr::to_str) {
-        bbcode::dump_bbcode(stdout(), &contents)?;
+        dump_bbcode(stdout(), &contents)?;
     } else {
-        bbcode::dump_markdown(stdout(), &contents)?;
+        dump_markdown(stdout(), &contents)?;
     }
 
     Ok(())
