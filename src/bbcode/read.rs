@@ -68,14 +68,14 @@ enum TextChunk<'a> {
     },
 }
 
-fn extract_inner<'a>(tag_block: &'a str, kind: CodeKind) -> &'a str {
+fn extract_inner(tag_block: &str, kind: CodeKind) -> &str {
     // assume starts and ends have alredy been checked
     let tag_end = tag_block.find(']').expect("this can never happen") + 1;
 
     &tag_block[tag_end..(tag_block.len() - kind.end_seq().len())]
 }
 
-fn next_codestart<'a>(content: &'a str) -> Option<(usize, CodeKind)> {
+fn next_codestart(content: &str) -> Option<(usize, CodeKind)> {
     const PROBE: &str = CodeKind::common_start();
 
     content.find(PROBE).and_then(|pos| {
@@ -89,7 +89,7 @@ fn next_codestart<'a>(content: &'a str) -> Option<(usize, CodeKind)> {
     })
 }
 
-fn next_codeend<'a>(content: &'a str, kind: CodeKind) -> Option<usize> {
+fn next_codeend(content: &str, kind: CodeKind) -> Option<usize> {
     const NEWLINES: &[u8] = b"\r\n";
 
     let probe = kind.end_seq().as_bytes();
@@ -111,7 +111,7 @@ fn next_codeend<'a>(content: &'a str, kind: CodeKind) -> Option<usize> {
     None
 }
 
-fn parse_lang<'a>(content: &'a str) -> Option<&'a str> {
+fn parse_lang(content: &str) -> Option<&str> {
     lazy_static! {
         static ref LANG_TAG: Regex = Regex::new(r#"^\s*"?([^"]+?)"?\s*\]"#).unwrap();
     }
@@ -151,7 +151,7 @@ fn compact(chunks: Vec<TextChunk>) -> Vec<TextChunk> {
     ret
 }
 
-fn slurp_codetags<'a>(mut content: &'a str) -> Vec<TextChunk<'a>> {
+fn slurp_codetags(mut content: &str) -> Vec<TextChunk<'_>> {
     use TextChunk::*;
 
     let mut chunks = vec![];
@@ -324,7 +324,7 @@ fn list_head(input: &str) -> IResult<&str, ListHead> {
         },
     )(input)?;
 
-    if reminder.trim().len() != 0 {
+    if !reminder.trim().is_empty() {
         use nom::{error::Error as NomError, error::ErrorKind as NomErrorKind, Err as NomErr};
 
         return Err(NomErr::Error(NomError::new(reminder, NomErrorKind::Tag)));
@@ -411,8 +411,9 @@ fn to_markdown_quote(text: &str) -> String {
 }
 
 fn replace_bbcode(text: String) -> String {
+    type ReplacerFn = fn(&Captures<'_>) -> String;
     lazy_static! {
-        static ref REPLACEMENTS: [(Regex, fn(&Captures<'_>) -> String); 11] = [
+        static ref REPLACEMENTS: [(Regex, ReplacerFn); 11] = [
             (
                 Regex::new(r#"(?i)\[url="?(.+?)"?\](.+?)\[/url\]"#).unwrap(),
                 |caps| format!("[{}]({})", &caps[2], &caps[1])
@@ -486,7 +487,7 @@ fn convert_bbcode(content: &str) -> String {
                     kind,
                     lang,
                     content,
-                } => code_str(kind, lang, content).into(),
+                } => code_str(kind, lang, content),
             };
 
             s.push_str(&nxt);
