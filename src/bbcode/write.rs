@@ -187,23 +187,23 @@ where
 /// Writes the BBCode representation of the given Markdown contents to the given writer.
 /// This functions does not support the entitety of Markdown due to NERDZ-flavoured BBCode
 /// not supporting certain features.
-/// 
+///
 /// This function supports some markdown extensions, such as strikethrough.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use std::{io::{self, Write}, str};
 /// use bibi::dump_bbcode;
-/// 
+///
 /// fn main() -> io::Result<()> {
 ///     let mut writer = Vec::new();
 ///     dump_bbcode(&mut writer, "**Hello** ~~everybody~~")?;
-/// 
+///
 ///     // the Markdown parser also considers this the end of a paragraph,
 ///     // so an extra newline is added to the output
 ///     assert_eq!(str::from_utf8(&writer).unwrap(), "[b]Hello[/b] [del]everybody[/del]\n\n");
-/// 
+///
 ///     Ok(())
 /// }
 pub fn dump_bbcode(writer: impl io::Write, contents: &str) -> io::Result<()> {
