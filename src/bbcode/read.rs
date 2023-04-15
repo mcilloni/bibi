@@ -413,7 +413,7 @@ fn to_markdown_quote(text: &str) -> String {
 fn replace_bbcode(text: String) -> String {
     type ReplacerFn = fn(&Captures<'_>) -> String;
     lazy_static! {
-        static ref REPLACEMENTS: [(Regex, ReplacerFn); 11] = [
+        static ref REPLACEMENTS: [(Regex, ReplacerFn); 10] = [
             (
                 Regex::new(r#"(?i)\[url="?(.+?)"?\](.+?)\[/url\]"#).unwrap(),
                 |caps| format!("[{}]({})", &caps[2], &caps[1])
@@ -435,12 +435,8 @@ fn replace_bbcode(text: String) -> String {
                 |caps| format!("**{}**", &caps[1])
             ),
             (
-                Regex::new(r#"(?i)\[i\](.+?)\[/i\]"#).unwrap(),
+                Regex::new(r#"(?i)\[(?:i|cur)\](.+?)\[/(?:i|cur)\]"#).unwrap(),
                 |caps| format!("*{}*", &caps[1])
-            ),
-            (
-                Regex::new(r#"(?i)\[u\](.+?)\[/u\]"#).unwrap(),
-                |caps| format!("__{}__", &caps[1])
             ),
             (
                 Regex::new(r#"(?i)\[del\](.+?)\[/del\]"#).unwrap(),
@@ -455,7 +451,7 @@ fn replace_bbcode(text: String) -> String {
                 |caps| to_markdown_quote(&caps[1])
             ),
             (
-                // parse a BBCode list with either start= or type= attributes
+                // parse a BBCode list with start= or type= attributes
                 Regex::new(r#"(?si)\[list(.*?)\](.+?)\[/list\]"#).unwrap(),
                 |caps| match to_markdown_list(&caps[1], &caps[2]) {
                     Some(s) => s,
@@ -496,6 +492,40 @@ fn convert_bbcode(content: &str) -> String {
         })
 }
 
+/// Writes the given content to the given writer, attempting to convert NERDZ BBCode to Markdown.
+/// This function only supports a specific subset of NERDZ BBCode, especially the most "standard" bits such as
+/// - `[b]P[/b]` -> **P**
+/// - `[i]P[/i]` -> *P*
+/// - `[cur]P[/cur]` -> *P*
+/// - `[del]P[/del]` -> ~~P~~
+/// - `<newline>[big]P[/big]<newline>` -> # P (header)
+/// - `[url]P[/url]` -> [](P)
+/// - `[url="P"]Q[/url]` -> [Q](P)
+/// - `[img]P[/img]` -> ![](P)
+/// - `[quote]P[/quote]` -> > P (multiline)
+/// - `[list][*]P[/list]` -> - P (multiline)
+/// - `[list type="a"][*]P[/list]` -> a. P (multiline, with optional `start="N"`)
+/// - `[list type="A"][*]P[/list]` -> A. P (multiline, with optional `start="N"`)
+/// - `[list type="i"][*]P[/list]` -> i. P (multiline, with optional `start="N"`)
+/// - `[list type="I"][*]P[/list]` -> I. P (multiline, with optional `start="N"`)
+/// - `[list start="N"][*]P[/list]` -> N. P (multiline, optionally with `type="1"`)
+/// 
+/// # Examples
+///
+/// ```
+/// use std::{error::Error, io::{self, Write}, str};
+/// use bibi::dump_markdown;
+///
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     let mut writer = Vec::new();
+///     dump_markdown(&mut writer, "[b]Hello[/b] [del]everybody[/del]")?;
+///
+///     // the BBCode replace engine doesn't add any newlines or has any notion of "paragraphs"
+///     // in comparison to the Markdown parser
+///     assert_eq!(str::from_utf8(&writer)?, "**Hello** ~~everybody~~");
+///
+///     Ok(())
+/// } 
 pub fn dump_markdown(mut writer: impl io::Write, content: &str) -> io::Result<()> {
     write!(writer, "{}", convert_bbcode(content))
 }

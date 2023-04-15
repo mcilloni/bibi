@@ -193,16 +193,16 @@ where
 /// # Examples
 ///
 /// ```
-/// use std::{io::{self, Write}, str};
+/// use std::{error::Error, io::{self, Write}, str};
 /// use bibi::dump_bbcode;
 ///
-/// fn main() -> io::Result<()> {
+/// fn main() -> Result<(), Box<dyn Error>> {
 ///     let mut writer = Vec::new();
 ///     dump_bbcode(&mut writer, "**Hello** ~~everybody~~")?;
 ///
 ///     // the Markdown parser also considers this the end of a paragraph,
 ///     // so an extra newline is added to the output
-///     assert_eq!(str::from_utf8(&writer).unwrap(), "[b]Hello[/b] [del]everybody[/del]\n\n");
+///     assert_eq!(str::from_utf8(&writer)?, "[b]Hello[/b] [del]everybody[/del]\n\n");
 ///
 ///     Ok(())
 /// }
